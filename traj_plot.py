@@ -1,7 +1,10 @@
+#!/APSshare/anaconda3/BlueSky/bin/python3 
+
 import sys
 from PyQt5.QtWidgets import QMainWindow, QDialog, QApplication, QPushButton, QVBoxLayout, QHBoxLayout
 from PyQt5.QtWidgets import QWidget, QInputDialog, QLineEdit, QFileDialog, QAction, QTextEdit, QLabel, QTabWidget
-from PyQt5.QtGui import QIcon
+from PyQt5 import QtGui
+#from PyQt5.QtGui import QIcon
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -11,20 +14,23 @@ import numpy as np
 from numpy import genfromtxt
 import math
 
+import epics
+import os
+
 #temp data storage
 import tempData as tdat
 
 class QPlotter(QWidget):
-	def __init__(self, parent=None):		
-		super(QPlotter, self).__init__(parent)
+	def __init__(self, parent = None):		
+		super(QPlotter, self).__init__()
     	
 		# a figure instance to plot on
 		self.figure1 = plt.figure()
 		self.figure2 = plt.figure()
 
-		self.x_lim = [-500,500]
-		self.y_lim = [-500,500]
-		self.t_lim = [0,1e6]
+		self.x_lim = [-5000,5000]
+		self.y_lim = [-5000,5000]
+		self.t_lim = [0,2.5e4]
 		
 		self.canvas1 = FigureCanvas(self.figure1)
 		self.toolbar1 = NavigationToolbar(self.canvas1, self)
@@ -82,18 +88,33 @@ class QPlotter(QWidget):
 		plotSettings.addLayout(plotXSettings)
 		plotSettings.addLayout(plotYSettings)
 		plotSettings.addLayout(plotTSettings)
+				
+		#self.fileDisplayLabel = QLabel(self)
+		#self.fileDisplayLabel.setText('File plotted: ')
+		#self.fileDisplay = QLineEdit()
+		#self.fileDisplay.setText('<filename.csv>')
+		#self.fileDisplay.setReadOnly(True)
+		#self.fileDisplay.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
+		#filePlotted = QHBoxLayout()
+		#filePlotted.addStretch(1)
+		#filePlotted.addWidget(self.fileDisplayLabel)
+		#filePlotted.addWidget(self.fileDisplay)
 		
 		# buttons on bottom
-		self.button = QPushButton('Plot')
+		self.button = QPushButton('Plot Loaded Data')
 		self.button.clicked.connect(self.plot)
+		self.button2 = QPushButton('Load Latest Scan')
+		self.button2.clicked.connect(self.loadLatest)
 		self.button1 = QPushButton('Clear Plot')
 		self.button1.clicked.connect(self.clear_plot)
 
 		buttons = QHBoxLayout()
 		buttons.addStretch(1)
+#		buttons.addLayout(filePlotted)
+		buttons.addWidget(self.button2)
 		buttons.addWidget(self.button)
 		buttons.addWidget(self.button1)
-
+		
 		controls = QHBoxLayout()
 		controls.addLayout(plotSettings)
 		controls.addStretch(1)
@@ -108,11 +129,29 @@ class QPlotter(QWidget):
 	def clear_plot(self):
 		self.figure1.clear()
 		self.canvas1.draw()
+		
+	def loadLatest(self):
+		dest_PV = epics.PV('2iddVELO:VP:Destination_Dir')
+		destPath = dest_PV.get(as_string=True)
+		filename_PV = epics.PV('2iddVELO:VP:Last_Filename')
+		posFile = filename_PV.value
+
+		destFilePath = os.path.join(destPath, posFile)		
+
+		data = genfromtxt(destFilePath, delimiter=',')
+
+		tdat.filename = posFile
+		tdat.x_ref = data[:,0]
+		tdat.y_ref = data[:,1]
+		tdat.x_act = data[:,2]
+		tdat.y_act = data[:,3]
+		tdat.det_v = data[:,4]
+		
+		self.plot()
+
 
 	def plot(self):
-		# instead of ax.hold(False)
 		self.figure1.clear()
-#		self.figure2.clear()
 
 		self.x_lim = [int(self.xmin.text()), int(self.xmax.text())]
 		self.y_lim = [int(self.ymin.text()), int(self.ymax.text())]
@@ -121,6 +160,7 @@ class QPlotter(QWidget):
 		if tdat.filename == '':
 			tdat.filename = 'arch_spiral_4500x30_3kHz_traces.csv'
 			data = genfromtxt(tdat.filename, delimiter=',')
+
 			tdat.x_ref = data[:,0]
 			tdat.y_ref = data[:,1]
 			tdat.x_act = data[:,2]
@@ -128,13 +168,16 @@ class QPlotter(QWidget):
 			tdat.det_v = data[:,4]
 	 
 		# create an axis
+		self.figure1.suptitle(tdat.filename)
+
 		ax = self.figure1.add_subplot(121)
 		bx = self.figure1.add_subplot(122)
-#		bx2 = self.figure2.add_subplot(312)
-#		bx3 = self.figure2.add_subplot(313)
 		
 		ax.set_xlim((self.x_lim[0], self.x_lim[1]))
 		ax.set_ylim((self.y_lim[0], self.y_lim[1]))
+		
+		bx.set_xlim((self.t_lim[0], len(tdat.x_ref)))
+		bx.set_ylim((min((self.x_lim[0],self.y_lim[0])),max((self.x_lim[1],self.y_lim[1]))))
 
 		ax.set_ylabel('y (nm)')
 		ax.set_xlabel('x (nm)')
@@ -144,35 +187,27 @@ class QPlotter(QWidget):
 
 		ax.set_title('XY Trajectories')
 		bx.set_title('X(t), Y(t)')
-
-#		self.setWindowTitle(tdat.filename)
 	
-		lineA1, = ax.plot(tdat.x_ref,tdat.y_ref,lw=1, color = 'b',label = 'reference trajectory')
-		lineA2, = ax.plot(tdat.x_act,tdat.y_act,lw=1, color = 'g',label = 'measured trajectory')
+		lineA1, = ax.plot(tdat.x_ref,tdat.y_ref,lw=1, color = 'xkcd:azure', 
+						  alpha = 0.9, label = 'reference trajectory')
+		lineA2, = ax.plot(tdat.x_act,tdat.y_act,lw=1, color = 'xkcd:orange', 
+						  alpha = 0.5, label = 'measured trajectory')
 
-		lineB1a, = bx.plot(tdat.x_ref, lw=1, color = 'b', label = 'x-reference')
-		lineB1b, = bx.plot(tdat.x_act, lw=1, color = 'g', label = 'x-actual')
+		lineB1a, = bx.plot(tdat.x_ref, lw=1, color = 'xkcd:azure', 
+						  alpha = 0.9, label = 'x-reference')
+		lineB1b, = bx.plot(tdat.x_act, lw=1, color = 'xkcd:orange', 
+						  alpha = 0.5, label = 'x-actual')
 
-		lineB2a, = bx.plot(tdat.y_ref, lw=1, color = 'r', label = 'y-reference')
-		lineB2b, = bx.plot(tdat.y_act, lw=1, color = 'm', label = 'y-actual')
+		lineB2a, = bx.plot(tdat.y_ref, lw=1, color = 'xkcd:azure', 
+						  alpha = 0.9, label = 'y-reference', linestyle = '-.')
+		lineB2b, = bx.plot(tdat.y_act, lw=1, color = 'xkcd:orange', 
+						  alpha = 0.5, label = 'y-actual', linestyle = '-.')
 
-#		lineB3, = bx.plot(tdat.det_v, lw=1, color = 'k', label = 'detector V')
-
-#		traj_legend = plt.legend(handles=[lineA1, lineA2])
-#		ax.add_legend(traj_legend)
-		
-#		trace_legend = plt.legend(handles=[lineB1a, lineB1b, lineB2a, lineB2b])
-#		bx.add_legend(trace_legend)
-		
-		ax.legend()
+		ax.legend(loc = 1)
 		bx.legend()
-
-#		self.figure1.legend()
-#		self.figure2.legend()
 
 		# refresh canvas
 		self.canvas1.draw()	
-#		self.canvas2.draw()	
 
 class App(QMainWindow):
 	def __init__(self, parent=None):
@@ -181,15 +216,15 @@ class App(QMainWindow):
 		self.left = 10
 		self.top = 10
 		self.width = 1350
-		self.height = 900
+		self.height = 850
 		self.initUI()
- 
+
 	def initUI(self):
 		self.setWindowTitle(self.title)
 		self.setGeometry(self.left, self.top, self.width, self.height)
 
-		plotter = QPlotter()
-		self.setCentralWidget(plotter)
+		self.plotter = QPlotter()
+		self.setCentralWidget(self.plotter)
 	
 		#temporarily using old file
 #		self.csvFile = 'arch_spiral_4500x30_3kHz_traces.csv'
@@ -216,13 +251,13 @@ class App(QMainWindow):
 		fname = QFileDialog.getOpenFileName(self, 'Open File')
 		if fname[0]:
 			tdat.filename = fname[0]
-			print(tdat.filename)
 			data = genfromtxt(tdat.filename, delimiter=',')
 			tdat.x_ref = data[:,0]
 			tdat.y_ref = data[:,1]
 			tdat.x_act = data[:,2]
 			tdat.y_act = data[:,3]
 			tdat.det_v = data[:,4]
+			self.plotter.plot()
 
 	def close_application(self):
 		sys.exit()
