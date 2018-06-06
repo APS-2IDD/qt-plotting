@@ -7,12 +7,13 @@ from PyQt5.QtGui import QIcon
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 
 import numpy as np
-from numpy import genfromtxt
 import math
-from readMDA import *
+from mda import *
 
 import epics
 import os
@@ -21,6 +22,11 @@ import re
 #temp data storage
 import temp_mdaData as mdat
 import temp_h5Data as hdat
+
+data1_name = b'dp_eiger:Stats1:Total_RBV'
+data2_name = b'dp_eiger:Stats1:CentroidX_RBV'
+data3_name = b'dp_eiger:Stats1:CentroidY_RBV'
+
 
 class QPlotter(QWidget):
 	def __init__(self, parent=None):		
@@ -37,62 +43,8 @@ class QPlotter(QWidget):
 		self.canvas1 = FigureCanvas(self.figure1)
 		self.toolbar1 = NavigationToolbar(self.canvas1, self)
 
-		# Plot settings on bottom
-		self.xmin = QLineEdit()
-		self.xmin.setText(str(self.x_lim[0]))
-		self.xminLabel = QLabel(self)
-		self.xminLabel.setText('x_min (nm): ')
-		self.xmax = QLineEdit()
-		self.xmax.setText(str(self.x_lim[1]))
-		self.xmaxLabel = QLabel(self)
-		self.xmaxLabel.setText('x_max (nm): ')
-
-		self.ymin = QLineEdit()
-		self.ymin.setText(str(self.y_lim[0]))
-		self.yminLabel = QLabel(self)
-		self.yminLabel.setText('y_min (nm): ')
-		self.ymax = QLineEdit()
-		self.ymax.setText(str(self.y_lim[1]))
-		self.ymaxLabel = QLabel(self)
-		self.ymaxLabel.setText('y_max (nm): ')
-
-		self.tmin = QLineEdit()
-		self.tmin.setText(str(self.t_lim[0]))
-		self.tminLabel = QLabel(self)
-		self.tminLabel.setText('t_min (nm): ')
-		self.tmax = QLineEdit()
-		self.tmax.setText(str(self.t_lim[1]))
-		self.tmaxLabel = QLabel(self)
-		self.tmaxLabel.setText('t_max (nm): ')
-
-		plotXSettings = QHBoxLayout()
-		plotXSettings.addStretch(1)
-		plotXSettings.addWidget(self.xminLabel)
-		plotXSettings.addWidget(self.xmin)
-		plotXSettings.addWidget(self.xmaxLabel)
-		plotXSettings.addWidget(self.xmax)
-
-		plotYSettings = QHBoxLayout()
-		plotYSettings.addStretch(1)
-		plotYSettings.addWidget(self.yminLabel)
-		plotYSettings.addWidget(self.ymin)
-		plotYSettings.addWidget(self.ymaxLabel)
-		plotYSettings.addWidget(self.ymax)
-
-		plotTSettings = QHBoxLayout()
-		plotTSettings.addStretch(1)
-		plotTSettings.addWidget(self.tminLabel)
-		plotTSettings.addWidget(self.tmin)
-		plotTSettings.addWidget(self.tmaxLabel)
-		plotTSettings.addWidget(self.tmax)
-		
-		plotSettings = QVBoxLayout()
-		plotSettings.addLayout(plotXSettings)
-		plotSettings.addLayout(plotYSettings)
-		plotSettings.addLayout(plotTSettings)
-		
 		# buttons on bottom
-		self.button = QPushButton('Plot Loaded Data')
+		self.button = QPushButton('Re-Plot Loaded Data')
 		self.button.clicked.connect(self.plot)
 		self.button2 = QPushButton('Load Latest Scan')
 		self.button2.clicked.connect(self.loadLatest)
@@ -106,7 +58,6 @@ class QPlotter(QWidget):
 		buttons.addWidget(self.button1)
 		
 		controls = QHBoxLayout()
-		controls.addLayout(plotSettings)
 		controls.addStretch(1)
 		controls.addLayout(buttons)
 
@@ -143,59 +94,54 @@ class QPlotter(QWidget):
 	def plot(self):
 		self.figure1.clear()
 
-		self.x_lim = [int(self.xmin.text()), int(self.xmax.text())]
-		self.y_lim = [int(self.ymin.text()), int(self.ymax.text())]
-		self.t_lim = [float(self.tmin.text()), float(self.tmax.text())]
+		#self.x_lim = [int(self.xmin.text()), int(self.xmax.text())]
+		#self.y_lim = [int(self.ymin.text()), int(self.ymax.text())]
+		#self.t_lim = [float(self.tmin.text()), float(self.tmax.text())]
 
-		if tdat.filename == '':
-			tdat.filename = 'arch_spiral_4500x30_3kHz_traces.csv'
-			data = genfromtxt(tdat.filename, delimiter=',')
-
-			tdat.x_ref = data[:,0]
-			tdat.y_ref = data[:,1]
-			tdat.x_act = data[:,2]
-			tdat.y_act = data[:,3]
-			tdat.det_v = data[:,4]
-	 
-		# create an axis
-		ax = self.figure1.add_subplot(121)
-		bx = self.figure1.add_subplot(122)
-		
-		ax.set_xlim((self.x_lim[0], self.x_lim[1]))
-		ax.set_ylim((self.y_lim[0], self.y_lim[1]))
-		
-		bx.set_xlim((self.t_lim[0], min((self.t_lim[1],len(tdat.x_ref)))))
-		bx.set_ylim((min((self.x_lim[0],self.y_lim[0])),max((self.x_lim[1],self.y_lim[1]))))
-
-		ax.set_ylabel('y (nm)')
-		ax.set_xlabel('x (nm)')
+		if mdat.filename != '':
+			#create grid for subplots
+			gs = gridspec.GridSpec(3,4)
+			
+			ax = self.figure1.add_subplot(gs[0,0])
+			bx = self.figure1.add_subplot(gs[1,0])
+			cx = self.figure1.add_subplot(gs[2,0])
+			dx = self.figure1.add_subplot(gs[0:,1:])
 	
-		bx.set_ylabel('x, y (nm)')
-		bx.set_xlabel('Time ')
-
-		ax.set_title('XY Trajectories')
-		bx.set_title('X(t), Y(t)')
+			#ax.set_xlim((self.x_lim[0], self.x_lim[1]))
+			#ax.set_ylim((self.y_lim[0], self.y_lim[1]))
+			
+			#bx.set_xlim((self.t_lim[0], min((self.t_lim[1],len(tdat.x_ref)))))
+			#bx.set_ylim((min((self.x_lim[0],self.y_lim[0])),max((self.x_lim[1],self.y_lim[1]))))
 	
-		lineA1, = ax.plot(tdat.x_ref,tdat.y_ref,lw=1, color = 'xkcd:azure', 
-						  alpha = 0.9, label = 'reference trajectory')
-		lineA2, = ax.plot(tdat.x_act,tdat.y_act,lw=1, color = 'xkcd:orange', 
-						  alpha = 0.5, label = 'measured trajectory')
+			if mdat.filename != '':
+				self.figure1.suptitle(mdat.filename, x = 0.1, ha='left')
 
-		lineB1a, = bx.plot(tdat.x_ref, lw=1, color = 'xkcd:azure', 
-						  alpha = 0.9, label = 'x-reference')
-		lineB1b, = bx.plot(tdat.x_act, lw=1, color = 'xkcd:orange', 
-						  alpha = 0.5, label = 'x-actual')
+			ax.set_title('Total Counts')
+			bx.set_title('Centroid X')
+			cx.set_title('Centroid Y')
 
-		lineB2a, = bx.plot(tdat.y_ref, lw=1, color = 'xkcd:azure', 
-						  alpha = 0.9, label = 'y-reference', linestyle = '-.')
-		lineB2b, = bx.plot(tdat.y_act, lw=1, color = 'xkcd:orange', 
-						  alpha = 0.5, label = 'y-actual', linestyle = '-.')
+			ax.tick_params(axis='x', which='both', bottom=False, top=False,         
+				labelbottom=False) 
 
-		ax.legend(loc = 1)
-		bx.legend()
+			bx.tick_params(axis='x', which='both', bottom=False, top=False,         
+				labelbottom=False) 
 
-		# refresh canvas
-		self.canvas1.draw()	
+			dx.tick_params(axis='y', which='both', right=True, left=False,        
+				labelleft=False, labelright=True)   
+				
+			ax.imshow(mdat.total_dat, cmap = 'hot')
+			bx.imshow(mdat.centroidX_dat, cmap = 'hot')
+			cx.imshow(mdat.centroidY_dat, cmap = 'hot')
+
+			if hdat.filename == '':
+				dx.set_title('<No hdf5 file selected/found>')
+			else:
+				dx.set_title(hdat.filename)
+#				dx.imshow(hdat.data)
+
+			
+			# refresh canvas
+			self.canvas1.draw()	
 
 class App(QMainWindow):
 	def __init__(self, parent=None):
@@ -218,8 +164,8 @@ class App(QMainWindow):
 		self.setWindowTitle(self.title)
 		self.setGeometry(self.left, self.top, self.width, self.height)
 
-		plotter = QPlotter()
-		self.setCentralWidget(plotter)
+		self.plotter = QPlotter()
+		self.setCentralWidget(self.plotter)
 	
 		mainMenu = self.menuBar()
 		fileMenu = mainMenu.addMenu('&File')
@@ -249,24 +195,30 @@ class App(QMainWindow):
 			fileName = self.mdaFilename.split('.')
 			fileNum = fileName[0].split('_')
 			fNum = int(fileNum[-1])
+			
+			
 			h5DirName = 'scan'+str(fNum).zfill(3)
 			self.h5Dir = '/'.join(fname_array[0:fNasize-2])+'/ptycho/'+h5DirName
 			h5File_prefix = h5DirName+'_data_'
 			re_h5File = re.escape(h5File_prefix)+r".*\.h5$"
 			self.h5Files = [f for f in os.listdir(self.h5Dir) if re.match(re_h5File, f)]
 
+			if len(self.h5Files) > 0:
+				hdat.filename = self.h5Files[0]
+
 			mdat.filename = self.mdaFilename
 
-			d = readMDA(fname[0], verbose = 0)
-			print(d)
+			dim = readMDA(fname[0], verbose = 0)
 
-#			tdat.filename = fname[0]
-#			data = genfromtxt(tdat.filename, delimiter=',')
-#			tdat.x_ref = data[:,0]
-#			tdat.y_ref = data[:,1]
-#			tdat.x_act = data[:,2]
-#			tdat.y_act = data[:,3]
-#			tdat.det_v = data[:,4]
+			data1_loc = [i for i in range(len(dim[2].d)) if dim[2].d[i].name == data1_name]
+			data2_loc = [i for i in range(len(dim[2].d)) if dim[2].d[i].name == data2_name]
+			data3_loc = [i for i in range(len(dim[2].d)) if dim[2].d[i].name == data3_name]
+
+			mdat.total_dat = dim[2].d[data1_loc[0]].data
+			mdat.centroidX_dat = dim[2].d[data2_loc[0]].data
+			mdat.centroidY_dat = dim[2].d[data3_loc[0]].data
+
+			self.plotter.plot()
 
 	def close_application(self):
 		sys.exit()
