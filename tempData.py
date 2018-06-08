@@ -1,7 +1,10 @@
 """
 
 """
+fileAndPath = ''
+fileDir = ''
 filename = ''
+local_files = []
 x_ref = []
 y_ref = []
 x_act = []

@@ -20,6 +20,27 @@ import os
 #temp data storage
 import tempData as tdat
 
+def getData(fileAndPath):
+	data = genfromtxt(fileAndPath, delimiter=',')
+	tdat.x_ref = data[:,0]
+	tdat.y_ref = data[:,1]
+	tdat.x_act = data[:,2]
+	tdat.y_act = data[:,3]
+	tdat.det_v = data[:,4]
+	tdat.fileAndPath(fileAndPath)
+	tdat.local_files = getFiles(fileAndPath)
+
+def getFiles(fileAndPath):
+	fname_array = fileAndPath.split('/')
+	fNasize = len(fname_array)
+	tdat.filename = fname_array[-1]
+	csvDir = '/'.join(fname_array[0:fNasize-1])
+	tdat.fileDir = csvDir
+	
+	list_of_files = [f for f in os.listdir(csvDir) if f.endswith(".csv")]
+	
+	return list_of_files
+
 class QPlotter(QWidget):
 	def __init__(self, parent = None):		
 		super(QPlotter, self).__init__()
@@ -101,10 +122,14 @@ class QPlotter(QWidget):
 		#filePlotted.addWidget(self.fileDisplay)
 		
 		# buttons on bottom
-		self.button = QPushButton('Plot Loaded Data')
-		self.button.clicked.connect(self.plot)
+#		self.button = QPushButton('Plot Loaded Data')
+#		self.button.clicked.connect(self.plot)
+		self.button3 = QPushButton('Plot Previous Traj')
+		self.button3.clicked.connect(self.loadTraj(inc = 'Prev'))
+		self.button4 = QPushButton('Plot Next Traj')
+		self.button4.clicked.connect(self.loadTraj(inc = 'Next'))
 		self.button2 = QPushButton('Load Latest Scan')
-		self.button2.clicked.connect(self.loadLatest)
+		self.button2.clicked.connect(self.loadTraj(inc = 'Latest'))
 		self.button1 = QPushButton('Clear Plot')
 		self.button1.clicked.connect(self.clear_plot)
 
@@ -112,7 +137,8 @@ class QPlotter(QWidget):
 		buttons.addStretch(1)
 #		buttons.addLayout(filePlotted)
 		buttons.addWidget(self.button2)
-		buttons.addWidget(self.button)
+		buttons.addWidget(self.button3)
+		buttons.addWidget(self.button4)
 		buttons.addWidget(self.button1)
 		
 		controls = QHBoxLayout()
@@ -138,17 +164,29 @@ class QPlotter(QWidget):
 
 		destFilePath = os.path.join(destPath, posFile)		
 
-		data = genfromtxt(destFilePath, delimiter=',')
+		getData(destFilePath) 
 
-		tdat.filename = posFile
-		tdat.x_ref = data[:,0]
-		tdat.y_ref = data[:,1]
-		tdat.x_act = data[:,2]
-		tdat.y_act = data[:,3]
-		tdat.det_v = data[:,4]
-		
 		self.plot()
 
+	def loadTraj(self, inc = 'Latest'):
+		if inc == 'Latest':
+			destPath_PV = epics.PV('2iddVELO:VP:Destination_Dir')
+			destPath = dest_PV.get(as_string=True)
+			filename_PV = epics.PV('2iddVELO:VP:Last_Filename')
+			trajFile = filename_PV.value
+		elif inc == 'Prev':
+			destPath = tdat.fileDir
+			
+			trajFile = tdat.local_file[]
+		elif inc == 'Next':		
+			destPath = tdat.fileDir
+
+			trajFile = tdat.local_file[]
+
+		trajFilePath = os.path.join(destPath, trajFile)
+		getData(trajFilePath)
+		
+		self.plot() 
 
 	def plot(self):
 		self.figure1.clear()
@@ -157,18 +195,11 @@ class QPlotter(QWidget):
 		self.y_lim = [int(self.ymin.text()), int(self.ymax.text())]
 		self.t_lim = [float(self.tmin.text()), float(self.tmax.text())]
 
-		if tdat.filename == '':
-			tdat.filename = 'arch_spiral_4500x30_3kHz_traces.csv'
-			data = genfromtxt(tdat.filename, delimiter=',')
+		if tdat.fileAndPath == '':
+			getData('arch_spiral_4500x30_3kHz_traces.csv', delimiter=',')
 
-			tdat.x_ref = data[:,0]
-			tdat.y_ref = data[:,1]
-			tdat.x_act = data[:,2]
-			tdat.y_act = data[:,3]
-			tdat.det_v = data[:,4]
-	 
 		# create an axis
-		self.figure1.suptitle(tdat.filename)
+		self.figure1.suptitle(tdat.fileAndPath)
 
 		ax = self.figure1.add_subplot(121)
 		bx = self.figure1.add_subplot(122)
@@ -208,7 +239,7 @@ class QPlotter(QWidget):
 
 		# refresh canvas
 		self.canvas1.draw()	
-
+		
 class App(QMainWindow):
 	def __init__(self, parent=None):
 		super().__init__()
@@ -250,13 +281,8 @@ class App(QMainWindow):
 	def file_open(self):
 		fname = QFileDialog.getOpenFileName(self, 'Open File')
 		if fname[0]:
-			tdat.filename = fname[0]
-			data = genfromtxt(tdat.filename, delimiter=',')
-			tdat.x_ref = data[:,0]
-			tdat.y_ref = data[:,1]
-			tdat.x_act = data[:,2]
-			tdat.y_act = data[:,3]
-			tdat.det_v = data[:,4]
+			tdat.fileAndPath = fname[0]
+			getData(tdat.fileAndPath)
 			self.plotter.plot()
 
 	def close_application(self):
