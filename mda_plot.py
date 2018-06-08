@@ -25,6 +25,7 @@ import math
 #temp data storage
 import temp_mdaData as mdat
 import temp_h5Data as hdat
+import temp_pltData as pdat
 
 data1_name = b'dp_eiger:Stats1:Total_RBV'
 data2_name = b'dp_eiger:Stats1:CentroidX_RBV'
@@ -49,21 +50,50 @@ def getHDFdata(h5Dir_Path, h5pref, scanNum, scanX, scanY):
 	
 	return  h5file_path, data 
 
+def plot_h5(h5Axis):
+	h5Axis.set_title(hdat.filename)
+	h5data = hdat.data[hdat.scanY,:,:]
+	h5Axis.imshow(h5data, cmap = h5_cmap)
+		
+	pdat.canvas.draw()
+
+def onclick(event):
+		if (((event.dblclick is False) and (event.button == 1)) and 
+		   (pdat.tot_axis.in_axes(event) or pdat.cX_axis.in_axes(event) or 
+		   pdat.cY_axis.in_axes(event))):
+			scanX = math.floor(event.xdata)
+			scanY = math.floor(event.ydata)
+			if scanX != hdat.scanX:
+				hdat.filename, hdat.data = getHDFdata(hdat.h5Path, 
+											hdat.h5Prefix, mdat.scanNum, 
+											scanX, scanY)
+				plot_h5(pdat.h5_axis)
+			else:
+				if scanY != hdat.scanY:
+					hdat.scanY = scanY
+					plot_h5(pdat.h5_axis)
+			print('xdata=%d, ydata=%d'%(math.floor(event.xdata), 
+				math.floor(event.ydata)))
+		else:
+			print('x=%f, y=%f'%(event.x, event.y))
+
         
 class QPlotter(QWidget):
 	def __init__(self, parent=None):		
 		super(QPlotter, self).__init__(parent)
     	
 		# a figure instance to plot on
-		self.figure1 = plt.figure()
+		pdat.fig = plt.figure()
 		self.figure2 = plt.figure()
 
 		self.x_lim = [-500,500]
 		self.y_lim = [-500,500]
 		self.t_lim = [0,1e4]
 		
-		self.canvas1 = FigureCanvas(self.figure1)
-		self.toolbar1 = NavigationToolbar(self.canvas1, self)
+		pdat.canvas = FigureCanvas(pdat.fig)
+		cid = pdat.canvas.mpl_connect('button_press_event', onclick)	
+
+		self.toolbar1 = NavigationToolbar(pdat.canvas, self)
 
 		# coordinate display on bottom
 		self.coordLabel = QLabel(self)
@@ -87,83 +117,52 @@ class QPlotter(QWidget):
 
 		layout = QVBoxLayout()
 		layout.addWidget(self.toolbar1)
-		layout.addWidget(self.canvas1)
+		layout.addWidget(pdat.canvas)
 		layout.addLayout(controls)
 		self.setLayout(layout)
 
 #		self.setMouseTracking(True)
 
 	def clear_plot(self):
-		self.figure1.clear()
-		self.canvas1.draw()
+		pdat.fig.clear()
+		pdat.canvas.draw()
 		
-	def plot_h5(self, h5Axis):
-		h5Axis.set_title(hdat.filename)
-		h5data = hdat.data[hdat.scanY,:,:]
-		h5Axis.imshow(h5data, cmap = h5_cmap)
-		
-		self.canvas1.draw()
-
 	def plot(self):
-		self.figure1.clear()
-
 		if mdat.filename != '':
-			#create grid for subplots
+			pdat.fig.clear()
+
 			gs = gridspec.GridSpec(3,4)
-			
-			ax = self.figure1.add_subplot(gs[0,0])
-			bx = self.figure1.add_subplot(gs[1,0])
-			cx = self.figure1.add_subplot(gs[2,0])
-			dx = self.figure1.add_subplot(gs[:,1:])
+			pdat.tot_axis = pdat.fig.add_subplot(gs[0,0])
+			pdat.cX_axis = pdat.fig.add_subplot(gs[1,0])
+			pdat.cY_axis = pdat.fig.add_subplot(gs[2,0])
+			pdat.h5_axis = pdat.fig.add_subplot(gs[:,1:])
+
+			pdat.fig.suptitle(mdat.filename, x = 0.1, ha='left')
+			pdat.tot_axis.set_title('Total Counts')
+			pdat.cX_axis.set_title('Centroid X')
+			pdat.cY_axis.set_title('Centroid Y')
+				
+			pdat.tot_axis.tick_params(axis='x', which='both', bottom=False, top=False,         
+				labelbottom=False) 
 	
-			if mdat.filename != '':
-				self.figure1.suptitle(mdat.filename, x = 0.1, ha='left')
-
-			ax.set_title('Total Counts')
-			bx.set_title('Centroid X')
-			cx.set_title('Centroid Y')
-			
-			ax.tick_params(axis='x', which='both', bottom=False, top=False,         
+			pdat.cX_axis.tick_params(axis='x', which='both', bottom=False, top=False,         
 				labelbottom=False) 
-
-			bx.tick_params(axis='x', which='both', bottom=False, top=False,         
-				labelbottom=False) 
-
-			dx.tick_params(axis='y', which='both', right=True, left=False, 
-				labelleft=False, labelright=True) 
-						
-			ax.imshow(mdat.total_dat.T, cmap = tot_cmap)
-			bx.imshow(mdat.centroidX_dat.T, cmap = cX_cmap)
-			cx.imshow(mdat.centroidY_dat.T, cmap = cY_cmap)
+	
+			pdat.h5_axis.tick_params(axis='y', which='both', right=True, left=False, 
+				labelleft=False, labelright=True) 			
+ 				
+			pdat.tot_axis.imshow(mdat.total_dat.T, cmap = tot_cmap)
+			pdat.cX_axis.imshow(mdat.centroidX_dat.T, cmap = cX_cmap)
+			pdat.cY_axis.imshow(mdat.centroidY_dat.T, cmap = cY_cmap)
 
 			if hdat.filename == '':
-				dx.set_title('<No hdf5 file selected/found>')
+				pdat.h5_axis.set_title('<No hdf5 file selected/found>')
 			else:
-				self.plot_h5(dx)
-
-			def onclick(event):
-				if (((event.dblclick is False) and (event.button == 1)) and 
-				(ax.in_axes(event) or bx.in_axes(event) or cx.in_axes(event))):
-					scanX = math.floor(event.xdata)
-					scanY = math.floor(event.ydata)
-					if scanX != hdat.scanX:
-						hdat.filename, hdat.data = getHDFdata(hdat.h5Path, 
-													hdat.h5Prefix, mdat.scanNum, 
-													scanX, scanY)
-						self.plot_h5(dx)
-					else:
-						if scanY != hdat.scanY:
-							hdat.scanY = scanY
-							self.plot_h5(dx)
-					print('xdata=%d, ydata=%d'%(math.floor(event.xdata), 
-						math.floor(event.ydata)))
-				else:
-					print('x=%f, y=%f'%(event.x, event.y))
-				
-			cid = self.canvas1.mpl_connect('button_press_event', onclick)
+				plot_h5(pdat.h5_axis)
 			
 			# refresh canvas
-			self.canvas1.draw()	
+			pdat.canvas.draw()	
+#			pdat.canvas.update()
 
 class App(QMainWindow):
 	def __init__(self, parent=None):
@@ -188,6 +187,7 @@ class App(QMainWindow):
 
 		self.plotter = QPlotter()
 		self.setCentralWidget(self.plotter)
+		
 	
 		mainMenu = self.menuBar()
 		fileMenu = mainMenu.addMenu('&File')
@@ -233,7 +233,6 @@ class App(QMainWindow):
 			hdat.h5Prefix = 'scan'+str(mdat.scanNum).zfill(3)
 			hdat.h5Path = '/'.join(fname_array[0:fNasize-2])+'/ptycho/'+hdat.h5Prefix
 			hdat.filename, hdat.data = getHDFdata(hdat.h5Path, hdat.h5Prefix, fNum, 0, 0)
-			
 			self.plotter.plot()
 
 	def close_application(self):
