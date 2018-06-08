@@ -169,7 +169,8 @@ class App(QMainWindow):
 		super().__init__()
 		self.title = 'MDA/H5 Viewer'
 		#when run @sec2idd, need to change default dir to /mnt/micdata2/velociprobe
-		self.default_dir = '/net/micdata/data2/velociprobe/2018-2/Jun_comm'
+#		self.default_dir = '/net/micdata/data2/velociprobe/2018-2/Jun_comm'
+		self.default_dir = '/'
 		self.mdaFilename = ''
 		self.mdaDir = ''
 		self.h5Filename = ''
