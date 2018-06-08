@@ -72,10 +72,10 @@ def onclick(event):
 				if scanY != hdat.scanY:
 					hdat.scanY = scanY
 					plot_h5(pdat.h5_axis)
-			print('xdata=%d, ydata=%d'%(math.floor(event.xdata), 
-				math.floor(event.ydata)))
-		else:
-			print('x=%f, y=%f'%(event.x, event.y))
+#			print('xdata=%d, ydata=%d'%(math.floor(event.xdata), 
+#				math.floor(event.ydata)))
+#		else:
+#			print('x=%f, y=%f'%(event.x, event.y))
 
         
 class QPlotter(QWidget):
