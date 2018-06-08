@@ -72,15 +72,12 @@ class QPlotter(QWidget):
 		# buttons on bottom
 		self.button = QPushButton('Re-Plot Loaded Data')
 		self.button.clicked.connect(self.plot)
-		self.button2 = QPushButton('Load Latest Scan')
-		self.button2.clicked.connect(self.loadLatest)
 		self.button1 = QPushButton('Clear Plot')
 		self.button1.clicked.connect(self.clear_plot)
 
 		buttons = QHBoxLayout()
 		buttons.addStretch(1)
 		buttons.addWidget(self.coordLabel)
-		buttons.addWidget(self.button2)
 		buttons.addWidget(self.button)
 		buttons.addWidget(self.button1)
 		
@@ -100,25 +97,6 @@ class QPlotter(QWidget):
 		self.figure1.clear()
 		self.canvas1.draw()
 		
-	def loadLatest(self):
-		dest_PV = epics.PV('2iddVELO:VP:Destination_Dir')
-		destPath = dest_PV.get(as_string=True)
-		filename_PV = epics.PV('2iddVELO:VP:Last_Filename')
-		posFile = filename_PV.value
-
-		destFilePath = os.path.join(destPath, posFile)		
-
-		data = genfromtxt(destFilePath, delimiter=',')
-
-		tdat.filename = posFile
-		tdat.x_ref = data[:,0]
-		tdat.y_ref = data[:,1]
-		tdat.x_act = data[:,2]
-		tdat.y_act = data[:,3]
-		tdat.det_v = data[:,4]
-		
-		self.plot()
-
 	def plot_h5(self, h5Axis):
 		h5Axis.set_title(hdat.filename)
 		h5data = hdat.data[hdat.scanY,:,:]
@@ -129,10 +107,6 @@ class QPlotter(QWidget):
 	def plot(self):
 		self.figure1.clear()
 
-		#self.x_lim = [int(self.xmin.text()), int(self.xmax.text())]
-		#self.y_lim = [int(self.ymin.text()), int(self.ymax.text())]
-		#self.t_lim = [float(self.tmin.text()), float(self.tmax.text())]
-
 		if mdat.filename != '':
 			#create grid for subplots
 			gs = gridspec.GridSpec(3,4)
@@ -141,12 +115,6 @@ class QPlotter(QWidget):
 			bx = self.figure1.add_subplot(gs[1,0])
 			cx = self.figure1.add_subplot(gs[2,0])
 			dx = self.figure1.add_subplot(gs[:,1:])
-	
-			#ax.set_xlim((self.x_lim[0], self.x_lim[1]))
-			#ax.set_ylim((self.y_lim[0], self.y_lim[1]))
-			
-			#bx.set_xlim((self.t_lim[0], min((self.t_lim[1],len(tdat.x_ref)))))
-			#bx.set_ylim((min((self.x_lim[0],self.y_lim[0])),max((self.x_lim[1],self.y_lim[1]))))
 	
 			if mdat.filename != '':
 				self.figure1.suptitle(mdat.filename, x = 0.1, ha='left')
@@ -187,10 +155,10 @@ class QPlotter(QWidget):
 						if scanY != hdat.scanY:
 							hdat.scanY = scanY
 							self.plot_h5(dx)
-#					print('xdata=%d, ydata=%d'%(math.floor(event.xdata), 
-#						math.floor(event.ydata)))
-#				else:
-#					print('x=%f, y=%f'%(event.x, event.y))
+					print('xdata=%d, ydata=%d'%(math.floor(event.xdata), 
+						math.floor(event.ydata)))
+				else:
+					print('x=%f, y=%f'%(event.x, event.y))
 				
 			cid = self.canvas1.mpl_connect('button_press_event', onclick)
 			
