@@ -94,17 +94,7 @@ class QPlotter(QWidget):
 		layout.addLayout(controls)
 		self.setLayout(layout)
 
-		self.setMouseTracking(True)
-
-	def mouseMoveEvent(self, event):
-		self.coordLabel.setText('Mouse coords: ( %d : %d )' % (event.x(), event.y()))
-
-#	def mousePressEvent(self, QMouseEvent):
-#		print(QMouseEvent.pos())
-
-#	def mouseReleaseEvent(self, QMouseEvent):
-#		cursor = QtGui.QCursor()
-#		print(cursor.pos())  
+#		self.setMouseTracking(True)
 
 	def clear_plot(self):
 		self.figure1.clear()
@@ -197,10 +187,10 @@ class QPlotter(QWidget):
 						if scanY != hdat.scanY:
 							hdat.scanY = scanY
 							self.plot_h5(dx)
-					print('xdata=%d, ydata=%d'%(math.floor(event.xdata), 
-						math.floor(event.ydata)))
-				else:
-					print('x=%f, y=%f'%(event.x, event.y))
+#					print('xdata=%d, ydata=%d'%(math.floor(event.xdata), 
+#						math.floor(event.ydata)))
+#				else:
+#					print('x=%f, y=%f'%(event.x, event.y))
 				
 			cid = self.canvas1.mpl_connect('button_press_event', onclick)
 			
