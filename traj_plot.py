@@ -29,6 +29,7 @@ def getData(fileAndPath):
 	tdat.det_v = data[:,4]
 	tdat.fileAndPath(fileAndPath)
 	tdat.local_files = getFiles(fileAndPath)
+#	tdat.index = #where tdat.local_files == tdat_filename OR do this in getFiles
 
 def getFiles(fileAndPath):
 	fname_array = fileAndPath.split('/')
@@ -38,7 +39,12 @@ def getFiles(fileAndPath):
 	tdat.fileDir = csvDir
 	
 	list_of_files = [f for f in os.listdir(csvDir) if f.endswith(".csv")]
-	
+
+	try:
+		tdat.local_files = list_of_files.index(tdat.filename)
+	except:
+		print('Error processing file -- csv file to be displayed not found in csv directory')
+		
 	return list_of_files
 
 class QPlotter(QWidget):
@@ -169,19 +175,14 @@ class QPlotter(QWidget):
 		self.plot()
 
 	def loadTraj(self, inc = 'Latest'):
-		if inc == 'Latest':
+		if ((inc == 'Prev') or (inc == 'Next') and (tdat.fileDir == []):
+			destPath = tdat.fileDir
+			trajFile = tdat.local_files[tdat.indes + (1 if (inc == 'Next') else -1)]
+		else:
 			destPath_PV = epics.PV('2iddVELO:VP:Destination_Dir')
 			destPath = dest_PV.get(as_string=True)
 			filename_PV = epics.PV('2iddVELO:VP:Last_Filename')
 			trajFile = filename_PV.value
-		elif inc == 'Prev':
-			destPath = tdat.fileDir
-			
-			trajFile = tdat.local_file[]
-		elif inc == 'Next':		
-			destPath = tdat.fileDir
-
-			trajFile = tdat.local_file[]
 
 		trajFilePath = os.path.join(destPath, trajFile)
 		getData(trajFilePath)
