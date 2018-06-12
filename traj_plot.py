@@ -1,7 +1,7 @@
 #!/APSshare/anaconda3/BlueSky/bin/python3 
 
 import sys
-from PyQt5.QtWidgets import QMainWindow, QDialog, QApplication, QPushButton, QVBoxLayout, QHBoxLayout
+from PyQt5.QtWidgets import QMainWindow, QDialog, QApplication, QPushButton, QVBoxLayout, QHBoxLayout, QMessageBox
 from PyQt5.QtWidgets import QWidget, QInputDialog, QLineEdit, QFileDialog, QAction, QTextEdit, QLabel, QTabWidget
 from PyQt5 import QtGui
 #from PyQt5.QtGui import QIcon
@@ -27,9 +27,8 @@ def getData(fileAndPath):
 	tdat.x_act = data[:,2]
 	tdat.y_act = data[:,3]
 	tdat.det_v = data[:,4]
-	tdat.fileAndPath(fileAndPath)
+	tdat.fileAndPath = fileAndPath
 	tdat.local_files = getFiles(fileAndPath)
-#	tdat.index = #where tdat.local_files == tdat_filename OR do this in getFiles
 
 def getFiles(fileAndPath):
 	fname_array = fileAndPath.split('/')
@@ -41,7 +40,7 @@ def getFiles(fileAndPath):
 	list_of_files = [f for f in os.listdir(csvDir) if f.endswith(".csv")]
 
 	try:
-		tdat.local_files = list_of_files.index(tdat.filename)
+		tdat.index = list_of_files.index(tdat.filename)
 	except:
 		print('Error processing file -- csv file to be displayed not found in csv directory')
 		
@@ -131,11 +130,11 @@ class QPlotter(QWidget):
 #		self.button = QPushButton('Plot Loaded Data')
 #		self.button.clicked.connect(self.plot)
 		self.button3 = QPushButton('Plot Previous Traj')
-		self.button3.clicked.connect(self.loadTraj(inc = 'Prev'))
+		self.button3.clicked.connect(lambda: self.loadTraj('Prev'))
 		self.button4 = QPushButton('Plot Next Traj')
-		self.button4.clicked.connect(self.loadTraj(inc = 'Next'))
+		self.button4.clicked.connect(lambda: self.loadTraj('Next'))
 		self.button2 = QPushButton('Load Latest Scan')
-		self.button2.clicked.connect(self.loadTraj(inc = 'Latest'))
+		self.button2.clicked.connect(lambda: self.loadTraj('Latest'))
 		self.button1 = QPushButton('Clear Plot')
 		self.button1.clicked.connect(self.clear_plot)
 
@@ -162,32 +161,45 @@ class QPlotter(QWidget):
 		self.figure1.clear()
 		self.canvas1.draw()
 		
-	def loadLatest(self):
-		dest_PV = epics.PV('2iddVELO:VP:Destination_Dir')
-		destPath = dest_PV.get(as_string=True)
-		filename_PV = epics.PV('2iddVELO:VP:Last_Filename')
-		posFile = filename_PV.value
+	#def loadLatest(self):
+		#dest_PV = epics.PV('2iddVELO:VP:Destination_Dir')
+		#destPath = dest_PV.get(as_string=True)
+		#filename_PV = epics.PV('2iddVELO:VP:Last_Filename')
+		#posFile = filename_PV.value
 
-		destFilePath = os.path.join(destPath, posFile)		
+		#destFilePath = os.path.join(destPath, posFile)		
 
-		getData(destFilePath) 
+		#getData(destFilePath) 
 
-		self.plot()
+		#self.plot()
 
-	def loadTraj(self, inc = 'Latest'):
-		if ((inc == 'Prev') or (inc == 'Next') and (tdat.fileDir == []):
+	def loadTraj(self, inc):
+		if (((inc == 'Prev') or (inc == 'Next')) and (tdat.fileDir != '')):
 			destPath = tdat.fileDir
-			trajFile = tdat.local_files[tdat.indes + (1 if (inc == 'Next') else -1)]
+			trajFile = tdat.local_files[tdat.index + (1 if (inc == 'Next') else -1)]
+			import1 = 'From tdat: destPath = '
+			import2 = 'From tdat: trajFile = '
 		else:
 			destPath_PV = epics.PV('2iddVELO:VP:Destination_Dir')
-			destPath = dest_PV.get(as_string=True)
+			destPath = destPath_PV.get(as_string=True)
 			filename_PV = epics.PV('2iddVELO:VP:Last_Filename')
 			trajFile = filename_PV.value
-
-		trajFilePath = os.path.join(destPath, trajFile)
-		getData(trajFilePath)
+			import1 = 'From PV: destPath = '
+			import2 = 'From PV: trajFile = '
 		
-		self.plot() 
+		try:
+			trajFilePath = os.path.join(destPath, trajFile)
+			getData(trajFilePath)
+		except:
+			print('Error getting data')
+			print(import1, destPath)
+			print(import2, trajFile)
+#			print "need to be root to run this program"
+#			self.logger.error("Not root, program exited")
+#			self.error_msg.setText('Error getting data \n ', import1, destPath, ' \n ', import2, trajFile)
+#			self.error_msg.exec_()
+		else:		
+			self.plot() 
 
 	def plot(self):
 		self.figure1.clear()
@@ -276,7 +288,7 @@ class App(QMainWindow):
 		extractAction.setStatusTip('Leave The App')
 		extractAction.triggered.connect(self.close_application)
 		fileMenu.addAction(extractAction)
-
+		
 		self.show()
 		
 	def file_open(self):

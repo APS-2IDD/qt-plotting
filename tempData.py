@@ -4,7 +4,7 @@
 fileAndPath = ''
 fileDir = ''
 filename = ''
-local_files = []
+local_files = ['']
 index = 0
 x_ref = []
 y_ref = []
